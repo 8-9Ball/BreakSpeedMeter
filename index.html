@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Break Speed"/>
+<title>Break Speed Meter</title>
+<style>
+  :root {
+    --bg:      #ffffff; --bg2: #f5f5f3; --bg3: #ededea;
+    --text:    #1a1a18; --text2: #6b6b68;
+    --border:  rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --danger:  #e24b4a; --success: #1d9e75; --info: #378add;
+    --warn:    #ba7517; --warn-bg: #faeeda;
+    --r: 8px; --rl: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #272725; --bg3: #313130;
+      --text: #f0ede8; --text2: #9a9994;
+      --border: rgba(255,255,255,0.12); --border2: rgba(255,255,255,0.22);
+      --warn-bg: #2a1f08;
+    }
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; }
+  body { display: flex; justify-content: center; }
+  #app { width: 100%; max-width: 520px; padding: 1.25rem 1rem 3rem; }
+
+  h1 { font-size: 18px; font-weight: 500; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px; }
+  .pill { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; background: var(--bg3); color: var(--text2); }
+
+  label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 3px; }
+  input[type=number], select {
+    width: 100%; padding: 0 10px; height: 38px; border-radius: var(--r);
+    border: 0.5px solid var(--border2); background: var(--bg); color: var(--text);
+    font-size: 15px; outline: none; -webkit-appearance: none; appearance: none;
+  }
+  input[type=number]:focus, select:focus { border-color: var(--info); box-shadow: 0 0 0 3px rgba(55,138,221,0.15); }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+  input[type=range] { width: 100%; accent-color: var(--info); cursor: pointer; }
+  button {
+    width: 100%; height: 44px; border-radius: var(--r); border: 0.5px solid var(--border2);
+    background: var(--bg); color: var(--text); font-size: 15px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; transition: background .12s;
+  }
+  button:active { background: var(--bg3); transform: scale(0.98); }
+  button.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  button.primary:active { opacity: 0.85; }
+
+  .gap { margin-bottom: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  .card  { background: var(--bg2); border-radius: var(--rl); padding: .9rem 1rem; }
+  .card-sm { background: var(--bg2); border-radius: var(--r); padding: .65rem .8rem; text-align: center; }
+  .card-sm .ml { font-size: 12px; color: var(--text2); }
+  .card-sm .mv { font-size: 22px; font-weight: 500; line-height: 1.2; }
+  .card-sm .ms { font-size: 11px; color: var(--text2); }
+
+  .pane { display: none; }
+  .pane.active { display: block; }
+  .hide { display: none !important; }
+
+  canvas { display: block; width: 100%; height: 64px; border-radius: var(--r); background: var(--bg2); margin: 8px 0; }
+
+  .dot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--border2); background: var(--bg2); display: inline-block; flex-shrink: 0; }
+  .dot.pulse { background: var(--danger); border-color: var(--danger); animation: blink .65s infinite alternate; }
+  .dot.hit   { background: var(--success); border-color: var(--success); }
+  .dot.warn  { background: var(--warn); border-color: var(--warn); }
+  @keyframes blink { from { opacity: .4; } to { opacity: 1; } }
+
+  .hit-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; color: var(--text2); }
+  .hit-row:last-child { border-bottom: none; }
+
+  .tier-wrap { position: relative; margin: 8px 0 3px; }
+  .tier-bar  { height: 8px; border-radius: 4px; background: linear-gradient(to right, #9FE1CB, #1D9E75, #FAC775, #BA7517, #E24B4A); }
+  .tier-needle { width: 3px; height: 14px; background: var(--text); border-radius: 2px; position: absolute; top: -3px; transition: left .4s ease; }
+  .tier-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text2); margin-top: 3px; }
+
+  .speed-hero { text-align: center; padding: 1rem 0 .25rem; }
+  .speed-hero .big  { font-size: 56px; font-weight: 500; line-height: 1; }
+  .speed-hero .unit { font-size: 17px; color: var(--text2); margin-top: 2px; }
+  .speed-hero .tier-lbl { font-size: 14px; font-weight: 500; margin-top: 8px; }
+
+  .warn-box { background: var(--warn-bg); border: 0.5px solid var(--warn); border-radius: var(--r); padding: .7rem .9rem; font-size: 13px; color: var(--warn); margin-bottom: 12px; line-height: 1.5; }
+
+  .log-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 0.5px solid var(--border); font-size: 13px; }
+  .log-row:last-child { border-bottom: none; }
+  .tier-pill { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; }
+
+  .note { font-size: 12px; color: var(--text2); margin-top: 5px; line-height: 1.55; }
+  .err  { font-size: 13px; color: var(--danger); margin-top: 6px; }
+  hr    { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <h1>Break Speed Meter <span class="pill">Pool</span></h1>
+
+  <!-- SETUP -->
+  <div class="pane active" id="pane-setup">
+    <div class="grid2 gap">
+      <div>
+        <label>Table preset</label>
+        <select id="preset">
+          <option value="9ft" selected>9-foot (47.75 in)</option>
+          <option value="8ft">8-foot (41.75 in)</option>
+          <option value="7ft">7-foot (35.75 in)</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div>
+        <label>Display units</label>
+        <select id="units">
+          <option value="mph">mph</option>
+          <option value="kmh">km/h</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="custom-row" class="hide gap">
+      <label>Distance — cue ball surface to 1-ball surface at contact</label>
+      <div class="grid2" style="margin-top:4px">
+        <input type="number" id="dist-val" value="47.75" min="1" step="0.01"/>
+        <select id="dist-unit">
+          <option value="in" selected>inches</option>
+          <option value="ft">feet</option>
+          <option value="m">metres</option>
+          <option value="cm">cm</option>
+        </select>
+      </div>
+      <p class="note">Ball diameter (2.25") already subtracted from presets. For custom, enter surface-to-surface travel distance.</p>
+    </div>
+
+    <div class="gap">
+      <label>Sensitivity — <span id="sens-val">0.12</span></label>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span style="font-size:11px;color:var(--text2)">quiet</span>
+        <input type="range" id="sens" min="0.02" max="0.45" step="0.01" value="0.12"/>
+        <span style="font-size:11px;color:var(--text2)">loud</span>
+      </div>
+      <p class="note">Place phone face-up on the <strong>mid-point of a side rail</strong> — equidistant from both sounds. Press Start, wait a moment, then break.</p>
+    </div>
+
+    <button class="primary" id="btn-arm">Arm detector →</button>
+    <p class="err hide" id="setup-err"></p>
+  </div>
+
+  <!-- READY -->
+  <div class="pane" id="pane-ready">
+    <canvas id="wave-ready"></canvas>
+    <p class="note" style="margin-bottom:12px">Microphone active. Press <strong>Start</strong>, pause briefly, then break. The detector listens for the cue strike and then the rack impact within a 70–300 ms window.</p>
+    <div class="grid2">
+      <button class="primary" id="btn-start">Start</button>
+      <button id="btn-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- LISTEN -->
+  <div class="pane" id="pane-listen">
+    <canvas id="wave-listen"></canvas>
+    <div style="display:flex;align-items:center;gap:8px;margin:6px 0 12px">
+      <span class="dot pulse" id="ldot"></span>
+      <span id="listen-lbl" style="font-size:14px;color:var(--text2)">Waiting for cue strike…</span>
+    </div>
+    <div id="listen-hits" style="margin-bottom:12px"></div>
+    <button id="btn-abort">Abort</button>
+  </div>
+
+  <!-- RESULT -->
+  <div class="pane" id="pane-result">
+
+    <div class="speed-hero">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:3px">Break speed</p>
+      <p class="big" id="res-speed">—</p>
+      <p class="unit" id="res-unit">mph</p>
+      <div class="tier-wrap">
+        <div class="tier-bar"></div>
+        <div class="tier-needle" id="needle" style="left:0"></div>
+      </div>
+      <div class="tier-labels">
+        <span>Recreational</span><span>League</span><span>Advanced</span><span>Pro</span>
+      </div>
+      <p class="tier-lbl" id="tier-label"></p>
+    </div>
+
+    <div class="warn-box hide" id="warn-box"></div>
+
+    <div class="grid3 gap" style="margin-top:12px">
+      <div class="card-sm"><p class="ml">Time delta</p><p class="mv" id="res-ms">—</p><p class="ms">ms</p></div>
+      <div class="card-sm"><p class="ml">Travel dist</p><p class="mv" id="res-dist">—</p><p class="ms">inches</p></div>
+      <div class="card-sm"><p class="ml">Alt speed</p><p class="mv" id="res-alt">—</p><p class="ms" id="res-alt-unit">km/h</p></div>
+    </div>
+
+    <div class="grid2 gap">
+      <button class="primary" id="btn-again">Break again</button>
+      <button id="btn-reconfigure">Reconfigure</button>
+    </div>
+
+    <div class="card hide" id="session-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:500">Session</span>
+        <button id="btn-clear" style="width:auto;padding:0 14px;height:32px;font-size:12px">Clear</button>
+      </div>
+      <div class="grid3 gap">
+        <div class="card-sm" style="background:var(--bg)"><p class="ml">Best</p><p class="mv" id="stat-best">—</p></div>
+        <div class="card-sm" style="background:var(--bg)"><p class="ml">Average</p><p class="mv" id="stat-avg">—</p></div>
+        <div class="card-sm" style="background:var(--bg)"><p class="ml">Breaks</p><p class="mv" id="stat-n">0</p></div>
+      </div>
+      <div id="log-list"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const PRESETS   = { '9ft': 47.75, '8ft': 41.75, '7ft': 35.75 };
+// MIN_GAP: fastest realistic break on 9ft table at ~36mph = 47.75in / (36*0.0254/0.001) ≈ 74ms
+// Set to 70ms — filters false double-triggers from the same transient
+const MIN_GAP   = 70;
+// MAX_GAP: slowest realistic break at ~10mph = 47.75in / (10*0.0254/0.001) ≈ 270ms
+// Set to 300ms — if rack impact doesn't arrive in time, reset hit 1 and wait again
+const MAX_GAP   = 300;
+// Speed above which we warn about a possible false read
+const WARN_MPH  = 36;
+
+const TIERS = [
+  { min: 0,   max: 14,  label: 'Recreational', color: '#1D9E75' },
+  { min: 14,  max: 19,  label: 'League',        color: '#9FE1CB' },
+  { min: 19,  max: 24,  label: 'Advanced',      color: '#FAC775' },
+  { min: 24,  max: 30,  label: 'Pro level',     color: '#E24B4A' },
+  { min: 30,  max: 999, label: 'Elite / Tour',  color: '#993C1D' },
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let audioCtx, analyser, source, stream;
+let rafId, waveId, maxGapTimer;
+let listening = false, hit1 = null, lastHit = 0;
+let distM = 47.75 * 0.0254, distIn = 47.75, unitPref = 'mph';
+let session = [];
+
+const $ = id => document.getElementById(id);
+const showPane = id =>
+  ['setup','ready','listen','result'].forEach(p =>
+    $('pane-' + p).classList.toggle('active', p === id));
+
+// ─── Controls ────────────────────────────────────────────────────────────────
+$('preset').addEventListener('change', e => {
+  const v = e.target.value;
+  $('custom-row').classList.toggle('hide', v !== 'custom');
+  if (v !== 'custom') { distIn = PRESETS[v]; distM = distIn * 0.0254; $('dist-val').value = distIn; }
+});
+$('dist-val').addEventListener('input',   () => { distIn = parseFloat($('dist-val').value) || 47.75; distM = toMetres(); });
+$('dist-unit').addEventListener('change', () => { distM = toMetres(); });
+$('sens').addEventListener('input', e => $('sens-val').textContent = parseFloat(e.target.value).toFixed(2));
+$('units').addEventListener('change', e => unitPref = e.target.value);
+
+function toMetres() {
+  const v = parseFloat($('dist-val').value) || 47.75, u = $('dist-unit').value;
+  return u === 'in' ? v * 0.0254 : u === 'ft' ? v * 0.3048 : u === 'm' ? v : v / 100;
+}
+
+// ─── Arm microphone ───────────────────────────────────────────────────────────
+$('btn-arm').addEventListener('click', armMic);
+
+async function armMic() {
+  const preset = $('preset').value;
+  if (preset !== 'custom') { distIn = PRESETS[preset]; distM = distIn * 0.0254; }
+  else { distM = toMetres(); distIn = parseFloat($('dist-val').value) || 47.75; }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showErr('Microphone API not available. Use Safari (iOS) or Chrome/Firefox on desktop.'); return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch(e) {
+    showErr('Microphone access denied. Check browser permissions and try again.'); return;
+  }
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  // fftSize 256 = ~5.8ms buffer at 44100Hz — good timing resolution
+  analyser.fftSize = 256;
+  source = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+  showPane('ready');
+  drawWave('wave-ready');
+}
+
+// ─── Start / Cancel / Abort ───────────────────────────────────────────────────
+$('btn-cancel').addEventListener('click', teardown);
+$('btn-abort').addEventListener('click',  teardown);
+
+$('btn-start').addEventListener('click', () => {
+  hit1 = null; listening = true; lastHit = 0;
+  $('listen-hits').innerHTML = '';
+  $('listen-lbl').textContent = 'Waiting for cue strike…';
+  $('ldot').className = 'dot pulse';
+  showPane('listen');
+  cancelAnimationFrame(waveId);
+  drawWave('wave-listen');
+  detect();
+});
+
+// ─── Detection loop ───────────────────────────────────────────────────────────
+function detect() {
+  const buf    = new Float32Array(analyser.fftSize);
+  const thresh = parseFloat($('sens').value);
+
+  function tick() {
+    if (!listening) return;
+    analyser.getFloatTimeDomainData(buf);
+    const peak = buf.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    const now  = performance.now();
+
+    if (peak > thresh && (now - lastHit) > MIN_GAP) {
+      lastHit = now;
+
+      if (!hit1) {
+        // ── Hit 1: cue strike ──
+        hit1 = { ts: audioCtx.currentTime, wall: now, peak };
+        renderHit(0, hit1);
+        $('listen-lbl').textContent = 'Cue strike detected — waiting for rack impact…';
+        $('ldot').className = 'dot pulse';
+
+        // Start MAX_GAP watchdog — if rack impact doesn't arrive in time, reset
+        clearTimeout(maxGapTimer);
+        maxGapTimer = setTimeout(() => {
+          if (listening && hit1) {
+            hit1 = null; lastHit = 0;
+            $('listen-hits').innerHTML = '';
+            $('listen-lbl').textContent = 'No rack impact — resetting, break again…';
+            $('ldot').className = 'dot warn';
+            setTimeout(() => {
+              if (listening) {
+                $('listen-lbl').textContent = 'Waiting for cue strike…';
+                $('ldot').className = 'dot pulse';
+              }
+            }, 1200);
+          }
+        }, MAX_GAP);
+
+      } else {
+        // ── Hit 2: rack impact ──
+        clearTimeout(maxGapTimer);
+        const hit2 = { ts: audioCtx.currentTime, peak };
+        renderHit(1, hit2);
+        listening = false;
+        cancelAnimationFrame(rafId);
+        finalize(hit1, hit2);
+        return;
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function renderHit(i, h) {
+  const existing = $('listen-hits').innerHTML;
+  const label = i === 0 ? 'Cue strike' : 'Rack impact';
+  $('listen-hits').innerHTML = existing + `
+    <div class="hit-row">
+      <span class="dot hit"></span>
+      <span>${label} — t = ${h.ts.toFixed(4)}s &nbsp; peak = ${h.peak.toFixed(3)}</span>
+    </div>`;
+}
+
+// ─── Calculate and display result ────────────────────────────────────────────
+function finalize(h1, h2) {
+  cancelAnimationFrame(waveId);
+  const dtSec   = h2.ts - h1.ts;
+  const dtMs    = dtSec * 1000;
+  const mps     = distM / dtSec;
+  const mph     = mps * 2.23694;
+  const kmh     = mps * 3.6;
+  const primary  = unitPref === 'mph' ? mph : kmh;
+  const altVal   = unitPref === 'mph' ? kmh : mph;
+  const altLabel = unitPref === 'mph' ? 'km/h' : 'mph';
+
+  $('res-speed').textContent    = primary.toFixed(1);
+  $('res-unit').textContent     = unitPref;
+  $('res-ms').textContent       = dtMs.toFixed(1);
+  $('res-dist').textContent     = distIn.toFixed(2);
+  $('res-alt').textContent      = altVal.toFixed(1);
+  $('res-alt-unit').textContent = altLabel;
+
+  // Tier needle
+  const tier = TIERS.find(t => mph >= t.min && mph < t.max) || TIERS[TIERS.length - 1];
+  $('tier-label').textContent = tier.label;
+  $('tier-label').style.color = tier.color;
+  const pct = Math.min(100, Math.max(0, (mph / 34) * 100));
+  $('needle').style.left = 'calc(' + pct + '% - 1.5px)';
+
+  // Sanity warning
+  const wb = $('warn-box');
+  if (mph > WARN_MPH) {
+    wb.textContent = '⚠ ' + primary.toFixed(1) + ' ' + unitPref + ' is above the typical maximum for amateur play — this may be a false read caused by a nearby sound triggering one of the detections. Try raising the sensitivity slider and break again.';
+    wb.classList.remove('hide');
+  } else {
+    wb.classList.add('hide');
+  }
+
+  // Session log
+  session.unshift({ mph, kmh, dtMs });
+  if (session.length > 10) session.pop();
+  renderSession();
+
+  showPane('result');
+  teardown();
+}
+
+// ─── Session log ─────────────────────────────────────────────────────────────
+function renderSession() {
+  if (!session.length) { $('session-box').classList.add('hide'); return; }
+  $('session-box').classList.remove('hide');
+  const vals = session.map(s => unitPref === 'mph' ? s.mph : s.kmh);
+  $('stat-best').textContent = Math.max(...vals).toFixed(1);
+  $('stat-avg').textContent  = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
+  $('stat-n').textContent    = session.length;
+  $('log-list').innerHTML = session.map((s, i) => {
+    const v    = (unitPref === 'mph' ? s.mph : s.kmh).toFixed(1);
+    const flag = s.mph > WARN_MPH ? ' ⚠' : '';
+    const tier = TIERS.find(t => s.mph >= t.min && s.mph < t.max) || TIERS[TIERS.length - 1];
+    return `<div class="log-row">
+      <span style="color:var(--text2);font-size:12px">#${session.length - i}</span>
+      <span style="font-weight:500">${v}${flag} <span style="font-weight:400;font-size:12px;color:var(--text2)">${unitPref}</span></span>
+      <span style="font-size:11px;color:var(--text2)">${s.dtMs.toFixed(0)} ms</span>
+      <span class="tier-pill" style="background:${tier.color}22;color:${tier.color}">${tier.label}</span>
+    </div>`;
+  }).join('');
+}
+$('btn-clear').addEventListener('click', () => { session = []; renderSession(); });
+
+// ─── Break again ──────────────────────────────────────────────────────────────
+$('btn-again').addEventListener('click', async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+    });
+  } catch(e) { return; }
+  audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+  analyser  = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  source    = audioCtx.createMediaStreamSource(stream);
+  source.connect(analyser);
+  hit1 = null; listening = true; lastHit = 0;
+  $('listen-hits').innerHTML = '';
+  $('listen-lbl').textContent = 'Waiting for cue strike…';
+  $('ldot').className = 'dot pulse';
+  showPane('listen');
+  drawWave('wave-listen');
+  detect();
+});
+
+$('btn-reconfigure').addEventListener('click', () => { teardown(); showPane('setup'); });
+
+// ─── Teardown ─────────────────────────────────────────────────────────────────
+function teardown() {
+  listening = false;
+  clearTimeout(maxGapTimer);
+  cancelAnimationFrame(rafId);
+  cancelAnimationFrame(waveId);
+  try { source && source.disconnect(); stream && stream.getTracks().forEach(t => t.stop()); audioCtx && audioCtx.close(); } catch(e) {}
+}
+
+function showErr(msg) { const e = $('setup-err'); e.textContent = msg; e.classList.remove('hide'); }
+
+// ─── Live waveform ────────────────────────────────────────────────────────────
+function drawWave(id) {
+  const canvas = $(id); if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const buf = new Uint8Array(analyser.fftSize);
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  function frame() {
+    if (!analyser) return;
+    analyser.getByteTimeDomainData(buf);
+    const w = canvas.offsetWidth || 400, h = canvas.offsetHeight || 64;
+    canvas.width = w; canvas.height = h;
+    ctx.fillStyle = dark ? '#272725' : '#f5f5f3';
+    ctx.fillRect(0, 0, w, h);
+    ctx.beginPath();
+    ctx.strokeStyle = dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 1.5;
+    const sw = w / buf.length; let x = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const y = (buf[i] / 128) * h / 2;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      x += sw;
+    }
+    ctx.stroke();
+    waveId = requestAnimationFrame(frame);
+  }
+  waveId = requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
